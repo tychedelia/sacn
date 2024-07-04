@@ -34,6 +34,7 @@ use std::borrow::Cow;
 use std::cmp::{max, Ordering};
 use std::collections::HashMap;
 use std::fmt;
+use std::io::Read;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::time::{Duration, Instant};
 
@@ -1356,10 +1357,10 @@ impl SacnNetworkReceiver {
     /// May return an error if there is an issue parsing the data from the underlying socket, see (parse)[fn.AcnRootLayerProtocol::parse.packet].
     ///
     fn recv<'a>(
-        &self,
+        &mut self,
         buf: &'a mut [u8; RCV_BUF_DEFAULT_SIZE],
     ) -> Result<AcnRootLayerProtocol<'a>> {
-        self.socket.recv(&mut buf[0..])?;
+        self.socket.read(&mut buf[0..])?;
 
         Ok(AcnRootLayerProtocol::parse(buf)?)
     }
@@ -1474,7 +1475,7 @@ impl DiscoveredSacnSource {
 #[cfg(not(target_os = "windows"))]
 fn create_unix_socket(addr: SocketAddr) -> Result<Socket> {
     if addr.is_ipv4() {
-        let socket = Socket::new(Domain::ipv4(), Type::dgram(), Some(Protocol::udp()))?;
+        let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
         // Multiple different processes might want to listen to the sACN stream so therefore need to allow re-using the ACN port.
         socket.set_reuse_port(true)?;
@@ -1485,7 +1486,7 @@ fn create_unix_socket(addr: SocketAddr) -> Result<Socket> {
         socket.bind(&socket_addr.into())?;
         Ok(socket)
     } else {
-        let socket = Socket::new(Domain::ipv6(), Type::dgram(), Some(Protocol::udp()))?;
+        let socket = Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?;
 
         // Multiple different processes might want to listen to the sACN stream so therefore need to allow re-using the ACN port.
         socket.set_reuse_port(true)?;
@@ -1514,7 +1515,7 @@ fn create_unix_socket(addr: SocketAddr) -> Result<Socket> {
 fn join_unix_multicast(socket: &Socket, addr: SockAddr, interface_addr: IpAddr) -> Result<()> {
     match addr.family() as i32 {
         // Cast required because AF_INET is defined in libc in terms of a c_int (i32) but addr.family returns using u16.
-        AF_INET => match addr.as_inet() {
+        AF_INET => match addr.as_socket_ipv4() {
             Some(a) => match interface_addr {
                 IpAddr::V4(ref interface_v4) => {
                     socket
@@ -1531,7 +1532,7 @@ fn join_unix_multicast(socket: &Socket, addr: SockAddr, interface_addr: IpAddr) 
                 bail!(ErrorKind::UnsupportedIpVersion("IP version recognised as AF_INET but not actually usable as AF_INET so must be unknown type".to_string()));
             }
         },
-        AF_INET6 => match addr.as_inet6() {
+        AF_INET6 => match addr.as_socket_ipv6() {
             Some(a) => {
                 socket
                     .join_multicast_v6(a.ip(), 0)
@@ -1565,7 +1566,7 @@ fn join_unix_multicast(socket: &Socket, addr: SockAddr, interface_addr: IpAddr) 
 fn leave_unix_multicast(socket: &Socket, addr: SockAddr, interface_addr: IpAddr) -> Result<()> {
     match addr.family() as i32 {
         // Cast required because AF_INET is defined in libc in terms of a c_int (i32) but addr.family returns using u16.
-        AF_INET => match addr.as_inet() {
+        AF_INET => match addr.as_socket_ipv4() {
             Some(a) => match interface_addr {
                 IpAddr::V4(ref interface_v4) => {
                     socket
@@ -1582,7 +1583,7 @@ fn leave_unix_multicast(socket: &Socket, addr: SockAddr, interface_addr: IpAddr)
                 bail!(ErrorKind::UnsupportedIpVersion("IP version recognised as AF_INET but not actually usable as AF_INET so must be unknown type".to_string()));
             }
         },
-        AF_INET6 => match addr.as_inet6() {
+        AF_INET6 => match addr.as_socket_ipv6() {
             Some(a) => {
                 socket
                     .leave_multicast_v6(a.ip(), 0)
@@ -1614,13 +1615,13 @@ fn leave_unix_multicast(socket: &Socket, addr: SockAddr, interface_addr: IpAddr)
 #[cfg(target_os = "windows")]
 fn create_win_socket(addr: SocketAddr) -> Result<Socket> {
     if addr.is_ipv4() {
-        let socket = Socket::new(Domain::ipv4(), Type::dgram(), Some(Protocol::udp()))?;
+        let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
         socket.set_reuse_address(true)?;
         socket.bind(&SockAddr::from(addr))?;
         Ok(socket)
     } else {
-        let socket = Socket::new(Domain::ipv6(), Type::dgram(), Some(Protocol::udp()))?;
+        let socket = Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?;
 
         socket.set_reuse_address(true)?;
         socket.bind(&SockAddr::from(addr))?;

@@ -566,9 +566,9 @@ impl SacnSourceInternal {
     /// 
     fn with_cid_ip(name: &str, cid: Uuid, ip: SocketAddr) -> Result<SacnSourceInternal> {
         let socket = if ip.is_ipv4() {
-            Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap()
+            Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap()
         } else if ip.is_ipv6() {
-            Socket::new(Domain::ipv6(), Type::dgram(), None).unwrap()
+            Socket::new(Domain::IPV6, Type::DGRAM, None).unwrap()
         } else {
             bail!(ErrorKind::UnsupportedIpVersion("Address to create SacnSource is not IPv4 or IPv6".to_string()));
         };
@@ -576,6 +576,8 @@ impl SacnSourceInternal {
         // Multiple different processes might want to send to the sACN stream so therefore need to allow re-using the ACN port.
         // Set reuse port is only supported on linux.
         #[cfg(target_os = "linux")]
+        socket.set_reuse_port(true)?;
+        #[cfg(target_os = "macos")]
         socket.set_reuse_port(true)?;
 
         // Set reuse address supported on linux and windows.

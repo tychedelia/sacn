@@ -18,7 +18,8 @@ use std::sync::mpsc::{Sender, SyncSender, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::iter;
-use std::convert::TryInto; // Used for converting between u8 and u16 representations. 
+use std::convert::TryInto;
+use std::io::Read; // Used for converting between u8 and u16 representations.
 use std::str; // Used for converting between bytes and strings.
 
 use sacn::source::SacnSource;
@@ -3313,7 +3314,7 @@ fn test_data_packet_transmit_format() {
     source.set_preview_mode(false).unwrap();
     source.set_multicast_loop_v4(true).unwrap();
 
-    let recv_socket = Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap();
+    let mut recv_socket = Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap();
     
     let addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), ACN_SDT_MULTICAST_PORT);
 
@@ -3327,7 +3328,7 @@ fn test_data_packet_transmit_format() {
     source.register_universes(&[universe]).unwrap();
 
     source.send(&[universe], &dmx_data, Some(PRIORITY), None, None).unwrap();
-    let (amt, _) = recv_socket.recv_from(&mut recv_buf).unwrap();
+    let amt = recv_socket.read(&mut recv_buf).unwrap();
 
     assert_eq!(&packet[..], &recv_buf[0..amt]);
 }
@@ -3344,7 +3345,7 @@ fn test_terminate_packet_transmit_format() {
 
     source.set_multicast_loop_v4(true).unwrap();
 
-    let recv_socket = Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap();
+    let mut recv_socket = Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap();
     
     let addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), ACN_SDT_MULTICAST_PORT);
 
@@ -3362,7 +3363,7 @@ fn test_terminate_packet_transmit_format() {
 
     source.terminate_stream(1, start_code).unwrap();
     for _ in 0..2 {
-        recv_socket.recv_from(&mut recv_buf).unwrap();
+        recv_socket.read(&mut recv_buf).unwrap();
         assert_eq!(
             match AcnRootLayerProtocol::parse(&recv_buf).unwrap().pdu.data {
                 E131RootLayerData::DataPacket(data) => data.stream_terminated,
@@ -3399,7 +3400,7 @@ fn test_sync_packet_transmit_format() {
     source.set_multicast_loop_v4(true).unwrap();
 
     // Create a standard udp receive socket to receive the packet sent by the source.
-    let recv_socket = Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap();
+    let mut recv_socket = Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap();
     
     let addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), ACN_SDT_MULTICAST_PORT);
 
@@ -3416,7 +3417,7 @@ fn test_sync_packet_transmit_format() {
     source.send_sync_packet(SYNC_ADDR, None).unwrap();
 
     // Receive the packet and compare its content to the expected.
-    recv_socket.recv_from(&mut recv_buf).unwrap();
+    recv_socket.read(&mut recv_buf).unwrap();
 
     assert_eq!(recv_buf[..], sync_packet[..], "Sync packet sent by source doesn't match expected format");
 }
@@ -3511,14 +3512,14 @@ fn test_discovery_packet_transmit_format() {
     source.set_multicast_loop_v4(true).unwrap();
 
     // Create a standard udp receive socket to receive the packet sent by the source.
-    let recv_socket = Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap();
+    let mut recv_socket = Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap();
     
     let addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), ACN_SDT_MULTICAST_PORT);
 
     recv_socket.bind(&addr.into()).unwrap();
 
     // Receiving on the discovery universe shows that the discovery universe is correctly used for discovery packets as per ANSI E1.31-2018 Section 6.2.7.
-    let address = universe_to_ipv4_multicast_addr(E131_DISCOVERY_UNIVERSE).unwrap().as_inet();
+    let address = universe_to_ipv4_multicast_addr(E131_DISCOVERY_UNIVERSE).unwrap().as_socket_ipv4();
 
     recv_socket
         .join_multicast_v4(&address.unwrap().ip(), &Ipv4Addr::new(0, 0, 0, 0))
@@ -3536,7 +3537,7 @@ fn test_discovery_packet_transmit_format() {
     // The source is expected to eventually send a universe discovery packet. 
 
     // Receive the packet and compare its content to the expected.
-    recv_socket.recv_from(&mut recv_buf).unwrap();
+    recv_socket.read(&mut recv_buf).unwrap();
 
     assert_eq!(recv_buf[..], discovery_packet[..], "Discovery packet sent by source doesn't match expected format");
 }
@@ -3606,7 +3607,7 @@ fn test_sync_packet_transmit_seq_numbers() {
     source.set_multicast_loop_v4(true).unwrap();
 
     // Create a standard udp receive socket to receive the packet sent by the source.
-    let recv_socket = Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap();
+    let mut recv_socket = Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap();
     
     let addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), ACN_SDT_MULTICAST_PORT);
 
@@ -3623,7 +3624,7 @@ fn test_sync_packet_transmit_seq_numbers() {
     source.send_sync_packet(UNIVERSE, None).unwrap();
 
     // Receive the packet and compare its content to the expected.
-    recv_socket.recv_from(&mut recv_buf).unwrap();
+    recv_socket.read(&mut recv_buf).unwrap();
 
     assert_eq!(recv_buf[..], sync_packet[..], "Sync packet sent by source doesn't match expected format");
 }
@@ -3673,13 +3674,13 @@ fn test_track_data_packet_seq_numbers() {
     source.set_is_sending_discovery(false);
 
     // Create receiver socket.
-    let recv_socket = Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap();
+    let mut recv_socket = Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap();
     let addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), ACN_SDT_MULTICAST_PORT);
     recv_socket.bind(&addr.into()).unwrap();
 
     // Join the multicast groups for each of the universes.
     for u in UNIVERSES.iter() {
-        let address = universe_to_ipv4_multicast_addr(*u).unwrap().as_inet();
+        let address = universe_to_ipv4_multicast_addr(*u).unwrap().as_socket_ipv4();
 
         recv_socket
             .join_multicast_v4(&address.unwrap().ip(), &Ipv4Addr::new(0, 0, 0, 0))
@@ -3693,7 +3694,7 @@ fn test_track_data_packet_seq_numbers() {
             source.send(&[*u], &dmx_data, Some(PRIORITY), None, None).unwrap();
 
             let mut recv_buf = [0; 1024];
-            let (amt, _) = recv_socket.recv_from(&mut recv_buf).unwrap();
+            let amt = recv_socket.read(&mut recv_buf).unwrap();
 
             assert_eq!(&recv_buf[0..amt], &expected_packet[..]);
         }
@@ -3742,13 +3743,13 @@ fn test_track_sync_packet_seq_numbers() {
     source.set_is_sending_discovery(false);
 
     // Create receiver socket.
-    let recv_socket = Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap();
+    let mut recv_socket = Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap();
     let addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), ACN_SDT_MULTICAST_PORT);
     recv_socket.bind(&addr.into()).unwrap();
 
     // Join the multicast groups for each of the synchronisation addresses.
     for u in SYNC_ADDRESSES.iter() {
-        let address = universe_to_ipv4_multicast_addr(*u).unwrap().as_inet();
+        let address = universe_to_ipv4_multicast_addr(*u).unwrap().as_socket_ipv4();
 
         recv_socket
             .join_multicast_v4(&address.unwrap().ip(), &Ipv4Addr::new(0, 0, 0, 0))
@@ -3762,7 +3763,7 @@ fn test_track_sync_packet_seq_numbers() {
             source.send_sync_packet(*a, None).unwrap();
 
             let mut recv_buf = [0; 1024];
-            let (amt, _) = recv_socket.recv_from(&mut recv_buf).unwrap();
+            let amt = recv_socket.read(&mut recv_buf).unwrap();
 
             assert_eq!(&recv_buf[0..amt], &expected_packet[..]);
         }
@@ -3821,7 +3822,7 @@ fn test_sync_packet_multicast_address() {
 
     let mut i = 0;
     for sync_addr in SYNC_ADDRESSES.iter() {
-        recv_sockets.push(Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap());
+        recv_sockets.push(Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap());
 
         // Join only the multicast address corresponding to the synchronisation address.
         let multicast_addr = universe_to_ipv4_multicast_addr(*sync_addr).unwrap();

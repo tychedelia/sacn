@@ -1225,7 +1225,7 @@ fn test_ip_equivalence() {
     ipv4_source.register_universes(&[universe as u16]).unwrap();
 
     // Create and setup the ipv4 receiver socket.
-    let ipv4_recv = Socket::new(Domain::ipv4(), Type::dgram(), None).unwrap();
+    let ipv4_recv = Socket::new(Domain::IPV4, Type::DGRAM, None).unwrap();
     let ipv4_multicast_addr = universe_to_ipv4_multicast_addr(universe).unwrap();
     let ipv4_discovery_multicast_addr = universe_to_ipv4_multicast_addr(E131_DISCOVERY_UNIVERSE).unwrap();
 
@@ -1246,7 +1246,7 @@ fn test_ip_equivalence() {
     ipv6_source.register_universes(&[universe]).unwrap();
 
     // Create and setup the ipv6 receiver socket.
-    let ipv6_recv = Socket::new(Domain::ipv6(), Type::dgram(), None).unwrap();
+    let ipv6_recv = Socket::new(Domain::IPV6, Type::DGRAM, None).unwrap();
     let ipv6_multicast_addr = universe_to_ipv6_multicast_addr(universe).unwrap();
     let ipv6_discovery_multicast_addr = universe_to_ipv6_multicast_addr(E131_DISCOVERY_UNIVERSE).unwrap();
 
