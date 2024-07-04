@@ -11,7 +11,6 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 byteorder = { version = "1.2.2", features = [] }
-net2 = { version = "0.2.39", optional = true }
 heapless = { version = "0.8.0", optional = true }
 socket2 = { version = "0.5.7", features = ["all"] }
 libc = { version = "0.2.67" } 
@@ -22,8 +21,6 @@ error-chain = "0.12.2"
 uuid = { version = "0.6.3", features = ["use_std", "v4"] }
 
 [features]
-default = ["std"]
-std = ["net2"]
 unstable = ["heapless"]
 
 [badges]
