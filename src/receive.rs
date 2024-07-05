@@ -1475,7 +1475,7 @@ impl DiscoveredSacnSource {
 #[cfg(not(target_os = "windows"))]
 fn create_unix_socket(addr: SocketAddr) -> Result<Socket> {
     if addr.is_ipv4() {
-        let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+        let socket = Socket::new(Domain::IPV4, Type::DGRAM, None)?;
 
         // Multiple different processes might want to listen to the sACN stream so therefore need to allow re-using the ACN port.
         socket.set_reuse_port(true)?;
@@ -1486,7 +1486,7 @@ fn create_unix_socket(addr: SocketAddr) -> Result<Socket> {
         socket.bind(&socket_addr.into())?;
         Ok(socket)
     } else {
-        let socket = Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?;
+        let socket = Socket::new(Domain::IPV6, Type::DGRAM, None)?;
 
         // Multiple different processes might want to listen to the sACN stream so therefore need to allow re-using the ACN port.
         socket.set_reuse_port(true)?;
